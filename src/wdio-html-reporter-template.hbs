@@ -199,6 +199,16 @@
             <td>{{#humanizeDuration metrics.duration}}{{/humanizeDuration}}</td>
         </tr>
         <tr>
+            <td>Browser</td>
+            <td>{{info.capabilities.browserName}}</td>
+        </tr>
+        <tr>
+            <td>WebDriver</td>
+            <td>{{info.config.hostname}}:{{info.config.port}}</td>
+        </tr>
+
+
+        <tr>
             <td>Breakdown</td>
             <td>
                 <table class="table table-bordered">
