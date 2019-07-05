@@ -1,15 +1,18 @@
-# wdio-html-format-reporter
+# wdio-html-reporter
 A reporter for webdriver.io which generates a HTML report.
-Based off the excellent [wdio-spec-reporter](https://www.npmjs.com/package/wdio-spec-reporter)
+A fork of [wdio-html-format-reporter](https://www.npmjs.com/package/wdio-html-format-reporter)
+
+That project has not been updated and doesnt work with the latest webdriverio.
+Due to name conflict issues,  this package had to be put in my user namespace. it is now in npm.
 
 ## Installation
 
-The easiest way is to keep the `wdio-html-format-reporter` as a devDependency in your package.json:
+The easiest way is to keep the `@rpii/wdio-html-reporter` as a devDependency in your package.json:
 
 ```javascript
 {
   "devDependencies": {
-    "wdio-html-format-reporter": "~0.2.7"
+    "@rpii/wdio-html-reporter": "~0.5.0"
   }
 }
 ```
@@ -17,7 +20,7 @@ The easiest way is to keep the `wdio-html-format-reporter` as a devDependency in
 Or, you can simply do it with:
 
 ```
-npm install wdio-html-format-reporter --save-dev
+yarn add @rpii/wdio-html-reporter --dev
 ```
 
 
@@ -27,112 +30,77 @@ The following code shows the default wdio test runner configuration. Just add 'h
 ```javascript
 // wdio.conf.js
 module.exports = {
-  // ...
-  reporters: ['spec', 'html-format'],
-  reporterOptions: {
-    htmlFormat: {
-      outputDir: './reports/'
-    },
-  },
-  screenshotPath: `./screenShots`,     
-  // ...    
+
+  
+  reporters: ['spec',
+        ['@rpii/wdio-html-reporter', {
+            debug: true,
+            outputDir: './reports/html-reports/',
+            filename: 'report.html',
+            reportTitle: 'Test Report Title',
+            showInBrowser:true
+        }
+        ]
+    ]
+    
+ 
 };
-```
+```  
+  
+## To generate a master report for all suites
 
-## Example test
+Add the following event handlers to you wdio.config.js
+
 ```javascript
-const assert = require('chai').assert
-const fs = require('fs-extra')
-const dateFormat = require('dateFormat')
+    onPrepare: function (config, capabilities) {
 
-describe('some example tests for a readme.md demo', () => {
-  describe('should be a passing test', () => {
-    it('check the package still exists on npm', () => {
-      browser.url("https://www.npmjs.com/package/wdio-html-format-reporter")
-      const expectedTitle = 'wdio-html-format-reporter'
-      assert.equal(browser.element('.package-name').getText(), expectedTitle, `The page title doesn't equal ${expectedTitle}`)
-    })
+        let reportAggregator = new ReportAggregator({
+            outputDir: './reports/html-reports/',
+            filename: 'master-report.html',
+            reportTitle: 'Master Report'
+        });
+        reportAggregator.clean() ;
 
-    it('should have an installation section', () => {
-      assert.isOk(browser.element('#user-content-installation').isVisible())
-    })
+        global.reportAggregator = reportAggregator;
+    },
+    
+    onComplete: function(exitCode, config, capabilities, results) {
+        (async () => {
+            await global.reportAggregator.createReport( {
+                config: config,
+                capabilities: capabilities,
+                results : results
+            });
+        })();
+    },
+    
+``` 
+## To show log messages in the output
+```javascript
+    logMessage(message) {
+        process.emit('test:log', message);
+    }
+```
+## To take a screenshot after test assert:   
+```  
+wdio.conf.js
 
-    it('should display an imbedded screenshot that I can zoom in on', () => {
-      browser.saveScreenshot(`${browser.options.screenshotPath}/screenshot-example.png`)
-    })
+    afterTest: function (test) {
+        const path = require('path');
+        const moment = require('moment');
 
-    it('should display some output I want to log on the report', () => {
-      // runner:logit is a custom event listener
-      // It will you to output plain text to the HTML report
-      process.send({
-        event: 'runner:logit',
-        output: 'Do. Or do not. There is no try'
-      })
-    })
-  })
-
-  describe('should have a failing test', () => {
-    it('should have an configuration section', () => {
-      assert.isOk(browser.element('#user-content-configuration').isVisible())
-    })
-
-    it('keywords should include "html"', () => {
-      assert.match(browser.element('//h3[text()="Keywords"]/following-sibling::p[contains(@class, "list-of-links")]').getText(), /html/, '"html" is not one of the keywords')
-    })
-
-    it('keywords should include "spec"', () => {
-      assert.match(browser.element('//h3[text()="Keywords"]/following-sibling::p[contains(@class, "list-of-links")]').getText(), /spec/, '"spec" is not one of the keywords')
-    })
-
-    it('keywords should include "wdio"', () => {
-      assert.match(browser.element('//h3[text()="Keywords"]/following-sibling::p[contains(@class, "list-of-links")]').getText(), /wdio/, '"wdio" is not one of the keywords')
-    })
-  })
-})
-
-describe('Full page screenshot', () => {
-  it('should open wateraid.org', () => {
-    browser.url('https://www.wateraid.org/')
-  })
-
-  it('should take full page screenshot using wdio-screenshot', () => {
-    // runner:logit is a custom event listener
-    // It will you to output plain text to the HTML report
-    process.send({
-      event: 'runner:logit',
-      output: 'great plugin for fullscreen screenshots: https://www.npmjs.com/package/wdio-screenshot'
-    })
-
-    const timestamp = dateFormat(new Date(), "yyyymmddHHMMss");
-    const filepath = `${browser.options.screenshotPath}/${browser.session().sessionId}/${timestamp}`
-
-    // using wdio-screenshot
-    browser.saveDocumentScreenshot(`${filepath}.png`);
-
-    // screenshot:fullpage is a custom event listener
-    // It prevents having to take a normal screenshot in order to trigger runner:screenshot
-    // then taking a second fullpage screenshot and overwriting the file
-    process.send({
-      event: 'screenshot:fullpage',
-      filename: `${filepath}.png`
-    })
-  })
-})
-
+        // if test passed, ignore, else take and save screenshot.
+        if (test.passed) {
+            return;
+        }
+        const timestamp = moment().format('YYYYMMDD-HHmmss.SSS');
+        const filepath = path.join('reports/html-reports/screenshots/', timestamp + '.png');
+        browser.saveScreenshot(filepath);
+        process.emit('test:screenshot', filepath);
+    },
 ```
 
-[Report Example: wdio-report.html](https://cdn.rawgit.com/aruiz-caritsqa/wdio-html-format-reporter/master/wdio-report.html)
-
-![Report Screenshot](wdio-report.jpg)
+![Report Screenshot](TestReport.png)
 
 
-## Output
-The default output is to `./wdio-report.html`
 
-## TODO:
-- ~~Make the output file configurable~~
-- ~~Convert images to JPG before embedding~~
-- Better filtering options
-- Reduce height of suite headers
-- Make sure it works with Jasmine tests
-- Pie chart?
